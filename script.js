@@ -1,65 +1,11 @@
-/*
-MIT License
-
-Copyright (c) 2017 Pavel Dobryakov
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
 'use strict';
-
-// Mobile promo section
-
-const promoPopup = document.getElementsByClassName('promo')[0];
-const promoPopupClose = document.getElementsByClassName('promo-close')[0];
-
-if (isMobile()) {
-    setTimeout(() => {
-        promoPopup.style.display = 'table';
-    }, 20000);
-}
-
-promoPopupClose.addEventListener('click', e => {
-    promoPopup.style.display = 'none';
-});
-
-const appleLink = document.getElementById('apple_link');
-appleLink.addEventListener('click', e => {
-    ga('send', 'event', 'link promo', 'app');
-    window.open('https://apps.apple.com/us/app/fluid-simulation/id1443124993');
-});
-
-const googleLink = document.getElementById('google_link');
-googleLink.addEventListener('click', e => {
-    ga('send', 'event', 'link promo', 'app');
-    window.open('https://play.google.com/store/apps/details?id=games.paveldogreat.fluidsimfree');
-});
-
-// Simulation section
 
 const canvas = document.getElementsByTagName('canvas')[0];
 resizeCanvas();
 
 let config = {
-    SIM_RESOLUTION: 128,
     DYE_RESOLUTION: 1024,
-    CAPTURE_RESOLUTION: 512,
+    SIM_RESOLUTION: 128,
     DENSITY_DISSIPATION: 1,
     VELOCITY_DISSIPATION: 0.2,
     PRESSURE: 0.8,
@@ -71,8 +17,6 @@ let config = {
     COLORFUL: true,
     COLOR_UPDATE_SPEED: 10,
     PAUSED: false,
-    BACK_COLOR: { r: 0, g: 0, b: 0 },
-    TRANSPARENT: false,
     BLOOM: true,
     BLOOM_ITERATIONS: 8,
     BLOOM_RESOLUTION: 256,
@@ -82,7 +26,48 @@ let config = {
     SUNRAYS: true,
     SUNRAYS_RESOLUTION: 196,
     SUNRAYS_WEIGHT: 1.0,
-}
+    BACK_COLOR: {"r":0,"g":0,"b":0},
+    TRANSPARENT: false,
+    CAPTURE_RESOLUTION: 512,
+    HSV_ENABLED: false,
+    HSV_HUE: 1.0,
+    HSV_SATURATION: 1.0,
+    HSV_VALUE: 1.0,
+    DISABLE_GUI: false,
+};
+
+const DEFAULT_CONFIG = {
+    DYE_RESOLUTION: 1024,
+    SIM_RESOLUTION: 128,
+    DENSITY_DISSIPATION: 1,
+    VELOCITY_DISSIPATION: 0.2,
+    PRESSURE: 0.8,
+    PRESSURE_ITERATIONS: 20,
+    CURL: 30,
+    SPLAT_RADIUS: 0.25,
+    SPLAT_FORCE: 6000,
+    SHADING: true,
+    COLORFUL: true,
+    COLOR_UPDATE_SPEED: 10,
+    PAUSED: false,
+    BLOOM: true,
+    BLOOM_ITERATIONS: 8,
+    BLOOM_RESOLUTION: 256,
+    BLOOM_INTENSITY: 0.8,
+    BLOOM_THRESHOLD: 0.6,
+    BLOOM_SOFT_KNEE: 0.7,
+    SUNRAYS: true,
+    SUNRAYS_RESOLUTION: 196,
+    SUNRAYS_WEIGHT: 1.0,
+    BACK_COLOR: {"r":0,"g":0,"b":0},
+    TRANSPARENT: false,
+    CAPTURE_RESOLUTION: 512,
+    HSV_ENABLED: false,
+    HSV_HUE: 1.0,
+    HSV_SATURATION: 1.0,
+    HSV_VALUE: 1.0,
+    DISABLE_GUI: false,
+};
 
 function pointerPrototype () {
     this.id = -1;
@@ -113,7 +98,9 @@ if (!ext.supportLinearFiltering) {
     config.SUNRAYS = false;
 }
 
-startGUI();
+if (!config.DISABLE_GUI) {
+    startGUI();
+}
 
 function getWebGLContext (canvas) {
     const params = { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false };
@@ -207,74 +194,105 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 
 function startGUI () {
     var gui = new dat.GUI({ width: 300 });
-    gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
-    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
-    gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion');
-    gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
-    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
-    gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
-    gui.add(config, 'COLORFUL').name('colorful');
-    gui.add(config, 'PAUSED').name('paused').listen();
+
+    let configTextarea = document.createElement('textarea');
+    configTextarea.style.width = '100%';
+    configTextarea.style.height = '450px';
+    configTextarea.readOnly = true;
+    if (!isMobile()) {
+        gui.domElement.insertBefore(configTextarea, gui.domElement.firstChild);
+    }
+
+    function updateConfigText() {
+        configTextarea.value = Object.entries(config)
+            .map(([key, value]) => {
+                if (typeof value === 'number') {
+                    value = Math.round(value * 1000) / 1000;
+                } else if (typeof value === 'object' && value !== null) {
+                    const roundedObj = {};
+                    for (let k in value) {
+                        roundedObj[k] = Math.round(value[k] * 1000) / 1000;
+                    }
+                    value = roundedObj;
+                }
+                return `${key}: ${JSON.stringify(value)},`;
+            })
+            .join('\n');
+    }
+
+    gui.add({ reset: function() {
+        Object.assign(config, DEFAULT_CONFIG);
+
+        // Update all controllers
+        for (let i in gui.__controllers) {
+            gui.__controllers[i].updateDisplay();
+        }
+
+        // Update all folders
+        for (let folder in gui.__folders) {
+            for (let i in gui.__folders[folder].__controllers) {
+                gui.__folders[folder].__controllers[i].updateDisplay();
+            }
+        }
+
+        // Trigger necessary updates
+        updateKeywords();
+        initFramebuffers();
+
+        updateConfigText();
+    }}, 'reset').name('Reset Config');
+
+    const addChangeListener = (controller) => {
+        controller.onChange(() => {
+            updateConfigText();
+        });
+    };
+
+    addChangeListener(gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers));
+    addChangeListener(gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers));
+
+    addChangeListener(gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion'));
+    addChangeListener(gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion'));
+    addChangeListener(gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure'));
+    addChangeListener(gui.add(config, 'PRESSURE_ITERATIONS', 1, 50).name('pressure iterations').step(1));
+    addChangeListener(gui.add(config, 'CURL', 0, 50).name('vorticity').step(1));
+    addChangeListener(gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius'));
+    addChangeListener(gui.add(config, 'SPLAT_FORCE', 0, 10000).name('splat force').step(1));
+    addChangeListener(gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords));
+    addChangeListener(gui.add(config, 'COLORFUL').name('colorful'));
+    addChangeListener(gui.add(config, 'COLOR_UPDATE_SPEED', 0, 100).name('color update speed').step(1));
+    addChangeListener(gui.add(config, 'PAUSED').name('paused').listen());
 
     gui.add({ fun: () => {
         splatStack.push(parseInt(Math.random() * 20) + 5);
     } }, 'fun').name('Random splats');
 
     let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
-    bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
-    bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
+    addChangeListener(bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords));
+    addChangeListener(bloomFolder.add(config, 'BLOOM_ITERATIONS', 1, 50).name('iterations').step(1));
+    addChangeListener(bloomFolder.add(config, 'BLOOM_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('resolution').onFinishChange(initFramebuffers));
+    addChangeListener(bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity'));
+    addChangeListener(bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold'));
+    addChangeListener(bloomFolder.add(config, 'BLOOM_SOFT_KNEE', 0.0, 1.0).name('soft knee'));
 
     let sunraysFolder = gui.addFolder('Sunrays');
-    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
-    sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
+    addChangeListener(sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords));
+    addChangeListener(sunraysFolder.add(config, 'SUNRAYS_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('resolution').onFinishChange(initFramebuffers));
+    addChangeListener(sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight'));
 
     let captureFolder = gui.addFolder('Capture');
-    captureFolder.addColor(config, 'BACK_COLOR').name('background color');
-    captureFolder.add(config, 'TRANSPARENT').name('transparent');
-    captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
+    addChangeListener(captureFolder.addColor(config, 'BACK_COLOR').name('background color'));
+    addChangeListener(captureFolder.add(config, 'TRANSPARENT').name('transparent'));
+    addChangeListener(captureFolder.add(config, 'CAPTURE_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('capture resolution').onFinishChange(initFramebuffers));
+    addChangeListener(captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot'));
 
-    let github = gui.add({ fun : () => {
-        window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
-        ga('send', 'event', 'link button', 'github');
-    } }, 'fun').name('Github');
-    github.__li.className = 'cr function bigFont';
-    github.__li.style.borderLeft = '3px solid #8C8C8C';
-    let githubIcon = document.createElement('span');
-    github.domElement.parentElement.appendChild(githubIcon);
-    githubIcon.className = 'icon github';
+    let hsvFolder = gui.addFolder('HSV');
+    addChangeListener(hsvFolder.add(config, 'HSV_ENABLED').name('enabled').onFinishChange(updateKeywords));
+    addChangeListener(hsvFolder.add(config, 'HSV_HUE', 0.0, 1.0).name('hue'));
+    addChangeListener(hsvFolder.add(config, 'HSV_SATURATION', 0.0, 1.0).name('saturation'));
+    addChangeListener(hsvFolder.add(config, 'HSV_VALUE', 0.0, 1.0).name('value'));
 
-    let twitter = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'twitter');
-        window.open('https://twitter.com/PavelDoGreat');
-    } }, 'fun').name('Twitter');
-    twitter.__li.className = 'cr function bigFont';
-    twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-    let twitterIcon = document.createElement('span');
-    twitter.domElement.parentElement.appendChild(twitterIcon);
-    twitterIcon.className = 'icon twitter';
-
-    let discord = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'discord');
-        window.open('https://discordapp.com/invite/CeqZDDE');
-    } }, 'fun').name('Discord');
-    discord.__li.className = 'cr function bigFont';
-    discord.__li.style.borderLeft = '3px solid #8C8C8C';
-    let discordIcon = document.createElement('span');
-    discord.domElement.parentElement.appendChild(discordIcon);
-    discordIcon.className = 'icon discord';
-
-    let app = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'app');
-        window.open('http://onelink.to/5b58bn');
-    } }, 'fun').name('Check out mobile app');
-    app.__li.className = 'cr function appBigFont';
-    app.__li.style.borderLeft = '3px solid #00FF7F';
-    let appIcon = document.createElement('span');
-    app.domElement.parentElement.appendChild(appIcon);
-    appIcon.className = 'icon app';
+    updateConfigText();
 
     if (isMobile())
         gui.close();
@@ -1563,7 +1581,19 @@ function correctDeltaY (delta) {
 }
 
 function generateColor () {
-    let c = HSVtoRGB(Math.random(), 1.0, 1.0);
+    let h, s, v;
+    if (config.HSV_ENABLED) {
+        h = config.HSV_HUE;
+        s = config.HSV_SATURATION;
+        v = config.HSV_VALUE;
+    } else {
+        h = Math.random();
+        s = 1.0;
+        v = 1.0;
+    }
+
+    let c = HSVtoRGB(h, s, v);
+
     c.r *= 0.15;
     c.g *= 0.15;
     c.b *= 0.15;
@@ -1586,7 +1616,6 @@ function HSVtoRGB (h, s, v) {
         case 4: r = t, g = p, b = v; break;
         case 5: r = v, g = p, b = q; break;
     }
-
     return {
         r,
         g,
